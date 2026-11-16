@@ -1,9 +1,12 @@
 # Host link over Wi-Fi (TCP port 6639). Use with:
 #   idf.py -B build-wifi -D SDKCONFIG=sdkconfig.wifi -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.host-wifi" build
-# Credentials: set OEPL_WIFI_SSID / OEPL_WIFI_PASSWORD with menuconfig, or in a local defaults file that is
-# not committed.
+# Credentials: set by the browser installer (Improv Serial) and kept in NVS. For development they can also be
+# set with OEPL_WIFI_SSID / OEPL_WIFI_PASSWORD (menuconfig or a local defaults file; never commit them).
 CONFIG_OEPL_HOST_LINK_WIFI=y
 CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
 CONFIG_LWIP_TCP_NODELAY=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-wifi.csv"
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+# USB Serial/JTAG is for Improv Serial; logs go to UART0 (TX/RX pins)
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

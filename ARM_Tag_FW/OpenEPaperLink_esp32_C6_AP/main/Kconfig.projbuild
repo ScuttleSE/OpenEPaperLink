@@ -91,6 +91,16 @@ menu "OEPL config"
     help
         Empty: oepl-hub-xxxx, from the last two bytes of the MAC.
 
+  config OEPL_IMPROV_SERIAL
+    depends on OEPL_HOST_LINK_WIFI
+    bool "Improv Serial on the native USB port (Wi-Fi setup from the browser installer)"
+    default y
+
+  config OEPL_HUB_FW_VERSION
+    depends on OEPL_HOST_LINK_WIFI
+    string "Version string reported by Improv"
+    default "dev"
+
   config OEPL_HOST_TCP_PORT
     depends on OEPL_HOST_LINK_WIFI
     int "TCP port for the host"

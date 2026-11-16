@@ -16,12 +16,14 @@
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/semphr.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
 #include "lwip/sockets.h"
 #include "mdns.h"
 #include "radio.h"
+#include "host_wifi.h"
 #include "second_uart.h"
 
 static const char *TAG = "HOST_WIFI";
@@ -34,16 +36,24 @@ static SemaphoreHandle_t clientMutex;
 static int clientSock = -1;
 volatile uint32_t uartOverflows = 0;
 
+#define WIFI_GOT_IP BIT0
+static EventGroupHandle_t wifiEvents;
+static esp_netif_t *staNetif;
+
 // --- Wi-Fi ------------------------------------------------------------------------------------------
 
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
+        wifi_config_t wc;
+        if (esp_wifi_get_config(WIFI_IF_STA, &wc) == ESP_OK && wc.sta.ssid[0]) esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t *d = data;
+        xEventGroupClearBits(wifiEvents, WIFI_GOT_IP);
         ESP_LOGW(TAG, "Wi-Fi disconnected (reason %d), reconnecting", d->reason);
+        vTaskDelay(pdMS_TO_TICKS(500));
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        xEventGroupSetBits(wifiEvents, WIFI_GOT_IP);
         const ip_event_got_ip_t *e = data;
         wifi_ap_record_t ap;
         int rssi = esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;
@@ -51,7 +61,7 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
-static void hostname(char *buf, size_t len) {
+void hostWifiHostname(char *buf, size_t len) {
     if (strlen(CONFIG_OEPL_WIFI_HOSTNAME)) {
         snprintf(buf, len, "%s", CONFIG_OEPL_WIFI_HOSTNAME);
         return;
@@ -62,10 +72,12 @@ static void hostname(char *buf, size_t len) {
 }
 
 static void wifi_start(void) {
+    wifiEvents = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     esp_netif_t *netif = esp_netif_create_default_wifi_sta();
+    staNetif = netif;
     char name[32];
-    hostname(name, sizeof(name));
+    hostWifiHostname(name, sizeof(name));
     esp_netif_set_hostname(netif, name);
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -83,7 +95,7 @@ static void wifi_start(void) {
         wc.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
     } else if (esp_wifi_get_config(WIFI_IF_STA, &wc) != ESP_OK || wc.sta.ssid[0] == 0) {
-        ESP_LOGE(TAG, "no Wi-Fi credentials");
+        ESP_LOGE(TAG, "no Wi-Fi credentials: set them with the installer (Improv Serial)");
     }
     ESP_ERROR_CHECK(esp_wifi_start());
     // no modem sleep: the host's ACKs must not wait for a DTIM beacon
@@ -95,6 +107,32 @@ static void wifi_start(void) {
         mdns_service_add(NULL, "_oepl-hub", "_tcp", CONFIG_OEPL_HOST_TCP_PORT, NULL, 0);
     }
     ESP_LOGW(TAG, "hub %s, TCP port %d", name, CONFIG_OEPL_HOST_TCP_PORT);
+#ifdef CONFIG_OEPL_IMPROV_SERIAL
+    improvStart();
+#endif
+}
+
+bool hostWifiConnect(const char *ssid, const char *password, uint32_t timeoutMs) {
+    wifi_config_t wc = {0};
+    strlcpy((char *) wc.sta.ssid, ssid, sizeof(wc.sta.ssid));
+    strlcpy((char *) wc.sta.password, password, sizeof(wc.sta.password));
+    wc.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    wc.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    esp_wifi_disconnect();
+    xEventGroupClearBits(wifiEvents, WIFI_GOT_IP);
+    if (esp_wifi_set_config(WIFI_IF_STA, &wc) != ESP_OK) return false;
+    esp_wifi_connect();
+    return xEventGroupWaitBits(wifiEvents, WIFI_GOT_IP, pdFALSE, pdTRUE, pdMS_TO_TICKS(timeoutMs)) & WIFI_GOT_IP;
+}
+
+bool hostWifiIp(char *buf, size_t len) {
+    if (!(xEventGroupGetBits(wifiEvents) & WIFI_GOT_IP)) return false;
+    if (buf) {
+        esp_netif_ip_info_t ip;
+        if (esp_netif_get_ip_info(staNetif, &ip) != ESP_OK) return false;
+        snprintf(buf, len, IPSTR, IP2STR(&ip.ip));
+    }
+    return true;
 }
 
 // --- TCP server ---------------------------------------------------------------------------------
