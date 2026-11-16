@@ -11,6 +11,7 @@ void uartTx(uint8_t data);
 void uartWrite(const uint8_t *data, size_t len);
 int uartRead(uint8_t *buf, int max);  // what the driver has buffered, without waiting
 void uartFlushInput();
+void uartWaitTxDone(uint32_t ms);  // until what was written has gone out
 extern volatile uint32_t uartOverflows;
 
 void uart_printf(const char *format, ...);

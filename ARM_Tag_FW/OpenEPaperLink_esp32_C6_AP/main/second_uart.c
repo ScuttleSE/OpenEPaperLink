@@ -1,3 +1,6 @@
+#include "sdkconfig.h"
+#ifdef CONFIG_OEPL_HOST_LINK_UART
+
 #include <esp_mac.h>
 #include <math.h>
 #include <stdarg.h>
@@ -78,6 +81,8 @@ int uartRead(uint8_t *buf, int max) {
 
 void uartFlushInput() { uart_flush_input(1); }
 
+void uartWaitTxDone(uint32_t ms) { uart_wait_tx_done(1, pdMS_TO_TICKS(ms)); }
+
 // Only wakes the main loop; reading is done there
 static void uart_event_task(void *pvParameters) {
     uart_event_t event;
@@ -114,3 +119,5 @@ void uart_printf(const char *format, ...) {
 		uart_write_bytes(1, buffer, len);
 	}
 }
+
+#endif

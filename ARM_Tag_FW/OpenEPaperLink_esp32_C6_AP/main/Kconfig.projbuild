@@ -47,6 +47,24 @@ menu "OEPL config"
     int "GPIO - UART RX"
     default 17
 
+  choice OEPL_HOST_LINK
+    prompt "Host link"
+    default OEPL_HOST_LINK_UART
+    help
+        How the radio talks to the host (the AP's ESP32, or a PC).
+
+    config OEPL_HOST_LINK_UART
+      bool "UART (GPIO pins of the hardware profile)"
+
+    config OEPL_HOST_LINK_USB
+      bool "Native USB (USB Serial/JTAG)"
+      depends on SOC_USB_SERIAL_JTAG_SUPPORTED
+      help
+          The host link uses the chip's own USB port. The console must not use USB Serial/JTAG:
+          build with sdkconfig.host-usb added to SDKCONFIG_DEFAULTS.
+
+  endchoice
+
   config OEPL_SUBGIG_SUPPORT
     bool "Enable SubGhz Support"
     default "n"    

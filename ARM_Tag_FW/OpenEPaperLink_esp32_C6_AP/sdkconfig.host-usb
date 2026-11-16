@@ -1,0 +1,6 @@
+# Host link over the native USB port. Use with:
+#   idf.py -B build-usb -D SDKCONFIG=sdkconfig.usb -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.host-usb" build
+CONFIG_OEPL_HOST_LINK_USB=y
+# The console stays on UART0 only; USB Serial/JTAG belongs to the host link
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

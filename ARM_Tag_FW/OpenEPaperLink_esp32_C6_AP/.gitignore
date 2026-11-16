@@ -6,3 +6,6 @@ build
 .vscode
 sdkconfig
 sdkconfig.old
+build-*
+sdkconfig.usb
+sdkconfig.usb.old

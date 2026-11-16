@@ -363,7 +363,7 @@ static bool processAscii(uint8_t lastchar) {
     if (isSame(cmdbuffer, "FRM1", 4)) {
         memset(cmdbuffer, 0, sizeof(cmdbuffer));
         pr("ACK>");
-        uart_wait_tx_done(1, pdMS_TO_TICKS(20));
+        uartWaitTxDone(20);
         delay(V2_SWITCH_DELAY_MS);
         uart_switch_speed(V2_BAUD);
         uartFlushInput();
