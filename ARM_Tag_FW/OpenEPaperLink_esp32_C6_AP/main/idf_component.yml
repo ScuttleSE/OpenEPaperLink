@@ -1,0 +1,5 @@
+dependencies:
+  espressif/mdns:
+    version: "^1.8.0"
+    rules:
+      - if: "$CONFIG{OEPL_HOST_LINK_WIFI} == True"

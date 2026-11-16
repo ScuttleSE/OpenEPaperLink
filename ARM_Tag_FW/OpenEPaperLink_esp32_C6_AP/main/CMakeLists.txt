@@ -2,6 +2,7 @@ idf_component_register(	SRCS
 						SRCS "utils.c"
 						SRCS "second_uart.c"
 						SRCS "host_usb.c"
+						SRCS "host_wifi.c"
 						SRCS "radio.c"
 						SRCS "SubGigRadio.c"
 						SRCS "cc1101_radio.c"

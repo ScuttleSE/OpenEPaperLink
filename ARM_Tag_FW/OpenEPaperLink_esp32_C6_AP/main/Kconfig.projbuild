@@ -63,7 +63,38 @@ menu "OEPL config"
           The host link uses the chip's own USB port. The console must not use USB Serial/JTAG:
           build with sdkconfig.host-usb added to SDKCONFIG_DEFAULTS.
 
+    config OEPL_HOST_LINK_WIFI
+      bool "Wi-Fi (TCP server)"
+      depends on SOC_WIFI_SUPPORTED
+      help
+          The host connects over TCP. Wi-Fi and 802.15.4 share the radio (coexistence).
+          Build with sdkconfig.host-wifi added to SDKCONFIG_DEFAULTS.
+
   endchoice
+
+  config OEPL_WIFI_SSID
+    depends on OEPL_HOST_LINK_WIFI
+    string "Wi-Fi SSID"
+    default ""
+    help
+        Empty: use the credentials stored in NVS.
+
+  config OEPL_WIFI_PASSWORD
+    depends on OEPL_HOST_LINK_WIFI
+    string "Wi-Fi password"
+    default ""
+
+  config OEPL_WIFI_HOSTNAME
+    depends on OEPL_HOST_LINK_WIFI
+    string "Hostname (mDNS)"
+    default ""
+    help
+        Empty: oepl-hub-xxxx, from the last two bytes of the MAC.
+
+  config OEPL_HOST_TCP_PORT
+    depends on OEPL_HOST_LINK_WIFI
+    int "TCP port for the host"
+    default 6639
 
   config OEPL_SUBGIG_SUPPORT
     bool "Enable SubGhz Support"
