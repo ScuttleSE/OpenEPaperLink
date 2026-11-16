@@ -117,6 +117,14 @@ void radio_init(uint8_t ch) {
     esp_ieee802154_set_short_address(0xFFFE);
     esp_ieee802154_set_rx_when_idle(true);
     esp_ieee802154_receive();
+#if !CONFIG_IEEE802154_TEST && CONFIG_ESP_COEX_SW_COEXIST_ENABLE
+    // Raise 802.15.4 over Wi-Fi (IDF default: IDLE/LOW/MIDDLE). Idle listening stays LOW so Wi-Fi still gets slots.
+    esp_ieee802154_set_coex_config((esp_ieee802154_coex_config_t){
+        .idle = IEEE802154_LOW,
+        .txrx = IEEE802154_HIGH,
+        .txrx_at = IEEE802154_HIGH,
+    });
+#endif
 
     led_flash(1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
