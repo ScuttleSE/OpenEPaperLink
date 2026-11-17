@@ -3,8 +3,17 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "sdkconfig.h"
 #include "second_uart.h"
 #include "utils.h"
+
+// Over Wi-Fi a host ACK takes up to several hundred ms (UART: a few ms). 3 retries x 1 s stays below
+// V2_LINK_LOST_MS. Shared header value for the cable links.
+#ifdef CONFIG_OEPL_HOST_LINK_WIFI
+#define EVENT_ACK_TIMEOUT_MS 1000
+#else
+#define EVENT_ACK_TIMEOUT_MS V2_ACK_TIMEOUT_MS
+#endif
 
 static const char *TAG = "V2";
 
@@ -189,7 +198,7 @@ void v2Poll(void) {
         sendHead(false);
         return;
     }
-    if (getMillis() - evSentMs < V2_ACK_TIMEOUT_MS) return;
+    if (getMillis() - evSentMs < EVENT_ACK_TIMEOUT_MS) return;
     if (evRetries < V2_RETRIES) {
         evRetries++;
         v2Retransmits++;
@@ -205,5 +214,5 @@ uint32_t v2MsUntilWork(void) {
     if (!active || !queued || linkDown) return UINT32_MAX;
     if (!evOutstanding) return 0;
     const uint32_t since = getMillis() - evSentMs;
-    return since >= V2_ACK_TIMEOUT_MS ? 0 : V2_ACK_TIMEOUT_MS - since;
+    return since >= EVENT_ACK_TIMEOUT_MS ? 0 : EVENT_ACK_TIMEOUT_MS - since;
 }
