@@ -10,6 +10,7 @@
 
 #include "driver/usb_serial_jtag.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -193,6 +194,8 @@ void improvStart(void) {
         ESP_LOGE(TAG, "no USB Serial/JTAG driver");
         return;
     }
+    // ROM printf (ESP_EARLY_LOGx, panics) also writes to USB Serial/JTAG on channel 2; keep it on UART0 only
+    esp_rom_install_channel_putc(2, NULL);
     xTaskCreate(improv_task, "improv", 4096, NULL, 5, NULL);
 }
 

@@ -8,6 +8,7 @@
 
 #include "driver/usb_serial_jtag.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
@@ -41,6 +42,8 @@ static void usb_rx_task(void *pvParameters) {
 void init_second_uart() {
     usb_serial_jtag_driver_config_t cfg = {.tx_buffer_size = TX_BUF_SIZE, .rx_buffer_size = RX_BUF_SIZE};
     ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&cfg));
+    // ROM printf (ESP_EARLY_LOGx, panics) also writes to USB Serial/JTAG on channel 2; keep it on UART0 only
+    esp_rom_install_channel_putc(2, NULL);
     rxStream = xStreamBufferCreate(RX_BUF_SIZE, 1);
     ESP_LOGI(TAG, "host link on USB Serial/JTAG");
     xTaskCreate(usb_rx_task, "usb_rx_task", 3072, NULL, 12, NULL);
