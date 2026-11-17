@@ -28,6 +28,9 @@ enum { TYPE_STATE = 1, TYPE_ERROR = 2, TYPE_RPC = 3, TYPE_RPC_RESULT = 4 };
 enum { STATE_READY = 2, STATE_PROVISIONING = 3, STATE_PROVISIONED = 4 };
 enum { ERR_NONE = 0, ERR_INVALID_RPC = 1, ERR_UNKNOWN_RPC = 2, ERR_UNABLE_TO_CONNECT = 3, ERR_UNKNOWN = 0xFF };
 enum { RPC_WIFI_SETTINGS = 1, RPC_CURRENT_STATE = 2, RPC_DEVICE_INFO = 3, RPC_SCAN = 4 };
+// Not in the Improv spec: the last Wi-Fi disconnect reason and scan result, for setup problems without a console
+#define RPC_OEPL_DIAG 0xFE
+static int lastScanCount = -1;
 
 static void send_packet(uint8_t type, const uint8_t *data, uint8_t len) {
     uint8_t buf[6 + 3 + 255 + 2];
@@ -129,8 +132,9 @@ static void handle_rpc(const uint8_t *d, uint8_t len) {
         }
         case RPC_SCAN: {
             uint16_t n = 0;
-            wifi_scan_config_t sc = {0};
-            if (esp_wifi_scan_start(&sc, true) == ESP_OK && esp_wifi_scan_get_ap_num(&n) == ESP_OK) {
+            lastScanCount = -1;
+            if (hostWifiScanStart() && esp_wifi_scan_get_ap_num(&n) == ESP_OK) {
+                lastScanCount = n;
                 if (n > 20) n = 20;
                 wifi_ap_record_t *aps = calloc(n ? n : 1, sizeof(wifi_ap_record_t));
                 if (aps && esp_wifi_scan_get_ap_records(&n, aps) == ESP_OK) {
@@ -145,7 +149,16 @@ static void handle_rpc(const uint8_t *d, uint8_t len) {
                 }
                 free(aps);
             }
+            hostWifiScanDone();
             send_result(RPC_SCAN, NULL, 0);  // end of the list
+            break;
+        }
+        case RPC_OEPL_DIAG: {
+            char reason[8], scan[8];
+            snprintf(reason, sizeof(reason), "%u", hostWifiLastReason());
+            snprintf(scan, sizeof(scan), "%d", lastScanCount);
+            const char *s[] = {reason, scan};
+            send_result(RPC_OEPL_DIAG, s, 2);
             break;
         }
         default:

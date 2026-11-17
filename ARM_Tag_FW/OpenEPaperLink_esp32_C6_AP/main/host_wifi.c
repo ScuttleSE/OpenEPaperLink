@@ -39,6 +39,8 @@ volatile uint32_t uartOverflows = 0;
 #define WIFI_GOT_IP BIT0
 static EventGroupHandle_t wifiEvents;
 static esp_netif_t *staNetif;
+static volatile bool scanning = false;
+static volatile uint8_t lastReason = 0;
 
 // --- Wi-Fi ------------------------------------------------------------------------------------------
 
@@ -49,9 +51,11 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t *d = data;
         xEventGroupClearBits(wifiEvents, WIFI_GOT_IP);
+        lastReason = d->reason;
         ESP_LOGW(TAG, "Wi-Fi disconnected (reason %d), reconnecting", d->reason);
         vTaskDelay(pdMS_TO_TICKS(500));
-        esp_wifi_connect();
+        // A scan can't start while the driver is connecting
+        if (!scanning) esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         xEventGroupSetBits(wifiEvents, WIFI_GOT_IP);
         const ip_event_got_ip_t *e = data;
@@ -121,9 +125,33 @@ bool hostWifiConnect(const char *ssid, const char *password, uint32_t timeoutMs)
     wc.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
     esp_wifi_disconnect();
     xEventGroupClearBits(wifiEvents, WIFI_GOT_IP);
+    lastReason = 0;
     if (esp_wifi_set_config(WIFI_IF_STA, &wc) != ESP_OK) return false;
     esp_wifi_connect();
     return xEventGroupWaitBits(wifiEvents, WIFI_GOT_IP, pdFALSE, pdTRUE, pdMS_TO_TICKS(timeoutMs)) & WIFI_GOT_IP;
+}
+
+uint8_t hostWifiLastReason(void) { return lastReason; }
+
+bool hostWifiScanStart(void) {
+    scanning = true;
+    if (!(xEventGroupGetBits(wifiEvents) & WIFI_GOT_IP)) esp_wifi_disconnect();
+    for (int i = 0; i < 10; i++) {
+        wifi_scan_config_t sc = {0};
+        const esp_err_t err = esp_wifi_scan_start(&sc, true);
+        if (err == ESP_OK) return true;
+        ESP_LOGW(TAG, "scan start: %s", esp_err_to_name(err));
+        vTaskDelay(pdMS_TO_TICKS(300));
+    }
+    return false;
+}
+
+void hostWifiScanDone(void) {
+    scanning = false;
+    wifi_config_t wc;
+    if (!(xEventGroupGetBits(wifiEvents) & WIFI_GOT_IP) && esp_wifi_get_config(WIFI_IF_STA, &wc) == ESP_OK &&
+        wc.sta.ssid[0])
+        esp_wifi_connect();
 }
 
 bool hostWifiIp(char *buf, size_t len) {

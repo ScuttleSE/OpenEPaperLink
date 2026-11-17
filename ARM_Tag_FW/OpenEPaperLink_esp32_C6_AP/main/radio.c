@@ -5,6 +5,9 @@
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_ieee802154.h"
+#if defined(CONFIG_OEPL_HOST_LINK_WIFI) && CONFIG_ESP_COEX_SW_COEXIST_ENABLE
+#include "esp_coexist.h"
+#endif
 #include "esp_log.h"
 #include "esp_phy_init.h"
 #include "esp_timer.h"
@@ -97,6 +100,10 @@ void radio_init(uint8_t ch) {
         esp_ieee802154_disable();
     }
     zigbee_is_enabled = true;
+#if defined(CONFIG_OEPL_HOST_LINK_WIFI) && CONFIG_ESP_COEX_SW_COEXIST_ENABLE
+    // Without this Wi-Fi and 802.15.4 don't share the radio: 802.15.4 listening starves Wi-Fi (no scan, auth timeouts)
+    ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
+#endif
     esp_ieee802154_enable();
     esp_ieee802154_set_channel(ch);
     // esp_ieee802154_set_txpower(int8_t power);
