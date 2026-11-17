@@ -116,6 +116,8 @@ static uint8_t burstLen    = 0;
 static uint8_t burstPos    = 0;
 static bool    burstActive = false;
 static int16_t burstLateMs = 0;
+#define BURST_COEX_HOLD_MS 100  // keep the radio after a burst: the tag's next request follows quickly
+static uint32_t burstEndMs = 0;
 
 // The S3 sends a HEARTBEAT every second. Without any frame for this long it is gone (rebooted, or
 // reset its end of the line): go back to the ASCII protocol at 115200 baud, where it starts again.
@@ -603,6 +605,7 @@ void processBlockRequest(const uint8_t *buffer) {
     // the tag asks again: it has given up on the burst that is still being sent
     if (burstActive && memcmp(rxHeader->src, dstMac, 8) == 0) {
         burstActive = false;
+        burstEndMs  = getMillis();
         cachePin(-1);
     }
 
@@ -810,6 +813,7 @@ static void startBurst(int slot, int32_t lateMs) {
     burstSlot   = slot;
     cachePin(slot);
     cacheTouch(slot);
+    radioCoexBoost(true);
     burstActive = true;
 }
 
@@ -819,6 +823,7 @@ static void burstStep() {
     sendPart(burstParts[burstPos++]);
     if (burstPos < burstLen) return;
     burstActive = false;
+    burstEndMs  = getMillis();
     cachePin(-1);
     struct v2BlockServed bs;
     memcpy(bs.mac, dstMac, 8);
@@ -1022,6 +1027,10 @@ void app_main(void) {
                 }
             }
             burstStep();
+            if (burstEndMs && !burstActive && !radioTxBusy() && getMillis() - burstEndMs >= BURST_COEX_HOLD_MS) {
+                radioCoexBoost(false);
+                burstEndMs = 0;
+            }
             v2Poll();
 
             if (ret <= 1) {

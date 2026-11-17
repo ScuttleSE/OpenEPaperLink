@@ -19,6 +19,7 @@ bool radioTx(uint8_t *packet);
 void radioSetChannel(uint8_t ch);
 void radioSetTxPower(uint8_t power);
 bool radioTxBusy(void);
+void radioCoexBoost(bool on);  // 802.15.4 over Wi-Fi, for a block burst
 int8_t commsRxUnencrypted(uint8_t *data);
 
 #ifdef SUBGIG_SUPPORT

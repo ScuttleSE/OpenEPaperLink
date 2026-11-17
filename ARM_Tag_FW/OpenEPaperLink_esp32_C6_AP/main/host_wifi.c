@@ -104,7 +104,7 @@ static void wifi_start(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
     // no modem sleep: the host's ACKs must not wait for a DTIM beacon
     // Modem sleep leaves the shared radio to 802.15.4 between beacons.
-    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     if (mdns_init() == ESP_OK) {
         mdns_hostname_set(name);

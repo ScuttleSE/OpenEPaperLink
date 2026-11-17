@@ -90,6 +90,27 @@ void esp_ieee802154_transmit_done(const uint8_t *frame, const uint8_t *ack, esp_
     }
 }
 static bool zigbee_is_enabled = false;
+
+// Wi-Fi coexistence: the IDF default priorities (802.15.4 idle IDLE, txrx LOW, txrx_at MIDDLE) keep Wi-Fi
+// connected, but a block burst then barely reaches the tag. Raised priorities for all traffic starve
+// Wi-Fi until it loses the AP. So 802.15.4 gets HIGH only around a burst (a few hundred ms).
+#if !CONFIG_IEEE802154_TEST && CONFIG_ESP_COEX_SW_COEXIST_ENABLE
+static esp_ieee802154_coex_config_t coexDefault;
+static bool coexBoosted = false;
+void radioCoexBoost(bool on) {
+    if (on == coexBoosted) return;
+    coexBoosted = on;
+    ESP_LOGI(TAG, "coex boost %s", on ? "on" : "off");
+    if (on) {
+        esp_ieee802154_set_coex_config((esp_ieee802154_coex_config_t){
+            .idle = IEEE802154_LOW, .txrx = IEEE802154_HIGH, .txrx_at = IEEE802154_HIGH});
+    } else {
+        esp_ieee802154_set_coex_config(coexDefault);
+    }
+}
+#else
+void radioCoexBoost(bool on) { (void) on; }
+#endif
 void radio_init(uint8_t ch) {
     if (packet_buffer == NULL) packet_buffer = xQueueCreate(32, sizeof(struct rxItem));
 
@@ -125,12 +146,7 @@ void radio_init(uint8_t ch) {
     esp_ieee802154_set_rx_when_idle(true);
     esp_ieee802154_receive();
 #if !CONFIG_IEEE802154_TEST && CONFIG_ESP_COEX_SW_COEXIST_ENABLE
-    // Raise 802.15.4 over Wi-Fi (IDF default: IDLE/LOW/MIDDLE). Idle listening stays LOW so Wi-Fi still gets slots.
-    esp_ieee802154_set_coex_config((esp_ieee802154_coex_config_t){
-        .idle = IEEE802154_LOW,
-        .txrx = IEEE802154_HIGH,
-        .txrx_at = IEEE802154_HIGH,
-    });
+    coexDefault = esp_ieee802154_get_coex_config();
 #endif
 
     led_flash(1);
